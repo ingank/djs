@@ -78,7 +78,7 @@ def emit_header(format: str, output: TextIO, count: int, skipped: int) -> None:
     emit_text(f"# Format:    {format}", output)
 
     if count:
-        emit_text(f"# Found:    {count} files", output)
+        emit_text(f"# Found:     {count} files", output)
 
     if skipped:
         emit_text(f"# Skipped:   {skipped} directories", output)
