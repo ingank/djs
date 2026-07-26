@@ -525,18 +525,11 @@ def build_parser():
         help="Generate hashes from audio files.",
         description="Generate hashes from audio files.",
     )
-    group = p.add_mutually_exclusive_group()
-    group.add_argument(
+    p.add_argument(
         "-fl",
         "--filelist",
         metavar="FILE",
         help="read file list from FILE",
-    )
-    group.add_argument(
-        "-hl",
-        "--hashlist",
-        metavar="FILE",
-        help="read hash list from FILE",
     )
     p.set_defaults(func=cmd_hashscan)
 
