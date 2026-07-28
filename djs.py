@@ -531,6 +531,11 @@ def build_parser():
         metavar="FILE",
         help="read file list from FILE",
     )
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        help="resume an interrupted scan using the last generated hash file",
+    )
     p.set_defaults(func=cmd_hashscan)
 
     # -----------------------------------------------------------------------
