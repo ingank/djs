@@ -53,6 +53,18 @@ def report_file_name(command: str) -> Path:
     return Path(START_DIR / f"{command}__{START_TIMESTAMP}.txt")
 
 
+def latest_report_file(command: str) -> Path | None:
+    """
+    Return the latest report file for *command* in START_DIR.
+
+    Returns None if no matching report exists.
+    """
+    files = START_DIR.glob(f"{command}__*.txt")
+    latest = max(files, default=None, key=lambda p: p.name)
+
+    return latest
+
+
 def emit_text(text: str, output: TextIO) -> None:
     """
     Emit a line of text to the console and an optional output stream.
@@ -316,6 +328,10 @@ def cmd_hashscan(args):
     format:
 
         <HASH> <RELATIVE_PATH>
+
+    When --resume is specified, the most recent hashscan report is read,
+    all existing hash/path records are copied into the new report, and
+    only files that are not yet present are hashed.
     """
     if args.filelist:
         filelist = Path(args.filelist)
@@ -327,11 +343,34 @@ def cmd_hashscan(args):
         print("Scanning filesystem...")
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
 
-    rep_file = report_file_name("hashscan").open("w", encoding="utf-8")
-    emit_header("hashscan", rep_file, len(files), len(skipped))
+    previous_records: list[tuple[str, Path]] = []
 
-    for file in files:
-        emit_text(hash_record(file), rep_file)
+    if args.resume:
+        previous = latest_report_file("hashscan")
+
+        if previous is None:
+            raise RuntimeError("No previous hashscan report found.")
+
+        print(f"Resuming from: {previous}")
+
+        previous_records = parse_hashlist(previous)
+        completed = {path for _, path in previous_records}
+        files = [path for path in files if path not in completed]
+
+    rep_file = report_file_name("hashscan").open("w", encoding="utf-8")
+
+    emit_header(
+        "hashlist",
+        rep_file,
+        len(previous_records) + len(files),
+        len(skipped),
+    )
+
+    for digest, path in previous_records:
+        emit_text(f"{digest} {path}", rep_file)
+
+    for path in files:
+        emit_text(hash_record(path), rep_file)
 
     emit_footer(rep_file)
     rep_file.close()
