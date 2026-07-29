@@ -79,6 +79,15 @@ def emit_text(text: str, output: TextIO) -> None:
         output.flush()
 
 
+def emit_comment(text: str, output: TextIO) -> None:
+    """
+    Emit a comment line.
+
+    Prefix *text* with ``"# "`` and forward it to :func:`emit_text`.
+    """
+    emit_text(f"# {text}", output)
+
+
 def emit_header(format: str, output: TextIO, count: int, skipped: int) -> None:
     """
     Write the standard report header.
