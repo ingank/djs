@@ -315,15 +315,21 @@ def cmd_finalize(args):
 
 
 def cmd_find(args):
-    rep_file = report_file_name("find").open("w", encoding="utf-8")
-    (files, skipped) = find_files(START_DIR, AUDIO_EXTENSIONS)
-    emit_header("filelist", rep_file, len(files), len(skipped))
+    report_file = report_file_name("find").open("w", encoding="utf-8")
+    files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
+    processed = 0
+
+    emit_header(report_file)
+    emit_found(len(files), report_file)
+    emit_skipped(len(skipped), report_file)
 
     for file in files:
-        emit_text(f"{file}", output=rep_file)
+        emit_text(f"{file}", report_file)
+        processed += 1
 
-    emit_footer(rep_file)
-    rep_file.close()
+    emit_processed(processed, report_file)
+    emit_footer(report_file)
+    report_file.close()
 
 
 def cmd_hashread(args):
