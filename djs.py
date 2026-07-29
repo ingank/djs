@@ -348,6 +348,16 @@ def cmd_hashscan(args):
         files = parse_filelist(filelist)
         skipped = []
 
+    if args.lastfilelist:
+        previous = latest_report_file("find")
+
+        if previous is None:
+            raise RuntimeError("No previous find report found.")
+
+        print(f"Reading file list: {previous}")
+        files = parse_filelist(previous)
+        skipped = []
+
     else:
         print("Scanning filesystem...")
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
@@ -573,11 +583,18 @@ def build_parser():
         help="Generate hashes from audio files.",
         description="Generate hashes from audio files.",
     )
-    p.add_argument(
+    filelist_group = p.add_mutually_exclusive_group()
+    filelist_group.add_argument(
         "-fl",
         "--filelist",
         metavar="FILE",
         help="read file list from FILE",
+    )
+    filelist_group.add_argument(
+        "-lfl",
+        "--lastfilelist",
+        action="store_true",
+        help="use the last generated file list",
     )
     p.add_argument(
         "--resume",
