@@ -564,11 +564,18 @@ def build_parser():
         help="Generate hashes from audio files.",
         description="Generate hashes from audio files.",
     )
-    p.add_argument(
+    filelist_group = p.add_mutually_exclusive_group()
+    filelist_group.add_argument(
         "-fl",
         "--filelist",
         metavar="FILE",
         help="read file list from FILE",
+    )
+    filelist_group.add_argument(
+        "-lfl",
+        "--lastfilelist",
+        action="store_true",
+        help="use the last generated file list",
     )
     p.add_argument(
         "--resume",
