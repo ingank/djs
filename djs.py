@@ -111,7 +111,7 @@ def emit_footer(output: TextIO) -> None:
     """
     Write a standard report footer.
     """
-    emit_text(f"# Status: OK", output)
+    emit_comment(f"Status: OK", output)
 
 
 def parse_filelist(filelist: Path) -> list[Path]:
