@@ -343,7 +343,7 @@ def cmd_hashscan(args):
         previous = latest_report_file("find")
 
         if previous is None:
-            raise RuntimeError("No previous hashscan report found.")
+            raise RuntimeError("No previous find report found.")
 
         print(f"Reading file list: {previous}")
         files = parse_filelist(previous)
