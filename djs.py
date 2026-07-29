@@ -88,15 +88,13 @@ def emit_comment(text: str, output: TextIO) -> None:
     emit_text(f"# {text}", output)
 
 
-def emit_header(format: str, output: TextIO, count: int, skipped: int) -> None:
+def emit_header(output: TextIO) -> None:
     """
-    Write the standard report header.
-
-    Emits metadata describing the current run, including the output
-    format, processed object count, skipped directory count, command
-    line, timestamp, and start directory.
+    Write a standard report header.
     """
-    emit_text(f"# Format:    {format}", output)
+    emit_comment(f"Timestamp: {START_TIMESTAMP}", output)
+    emit_comment(f"Directory: {START_DIR}", output)
+    emit_comment(f"Command:   {APP_NAME} {START_ARGS}", output)
 
     if count:
         emit_text(f"# Found:     {count} files", output)
