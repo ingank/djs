@@ -82,8 +82,6 @@ def emit_text(text: str, output: TextIO) -> None:
 def emit_comment(text: str, output: TextIO) -> None:
     """
     Emit a comment line.
-
-    Prefix *text* with ``"# "`` and forward it to :func:`emit_text`.
     """
     emit_text(f"# {text}", output)
 
@@ -96,18 +94,23 @@ def emit_header(output: TextIO) -> None:
     emit_comment(f"Directory: {START_DIR}", output)
     emit_comment(f"Command:   {APP_NAME} {START_ARGS}", output)
 
-    if count:
-        emit_text(f"# Found:     {count} files", output)
 
-    if skipped:
-        emit_text(f"# Skipped:   {skipped} directories", output)
+def emit_found(count: int, output: TextIO) -> None:
+    emit_comment(f"Found:     {count} files", output)
 
-    emit_text(f"# Command:   {APP_NAME} {START_ARGS}", output)
-    emit_text(f"# Timestamp: {START_TIMESTAMP}", output)
-    emit_text(f"# Directory: {START_DIR}", output)
+
+def emit_skipped(count: int, output: TextIO) -> None:
+    emit_comment(f"Skipped:   {count} directories", output)
+
+
+def emit_processed(count: int, output: TextIO) -> None:
+    emit_comment(f"Processed: {count} files", output)
 
 
 def emit_footer(output: TextIO) -> None:
+    """
+    Write a standard report footer.
+    """
     emit_text(f"# Status: OK", output)
 
 
