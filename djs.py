@@ -339,6 +339,16 @@ def cmd_hashscan(args):
         files = parse_filelist(filelist)
         skipped = []
 
+    if args.lastfilelist:
+        previous = latest_report_file("find")
+
+        if previous is None:
+            raise RuntimeError("No previous hashscan report found.")
+
+        print(f"Reading file list: {previous}")
+        files = parse_filelist(previous)
+        skipped = []
+
     else:
         print("Scanning filesystem...")
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
