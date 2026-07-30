@@ -366,7 +366,17 @@ def cmd_hashread(args):
 
 def cmd_hashscan(args):
     """
-    Compute SHA-256 hashes for all selected audio files.
+    Generate SHA-256 hashes for the selected audio files.
+
+    The input file list is taken from one of the following sources:
+
+    - an explicitly specified file list,
+    - the most recent 'find' report,
+    - or a fresh filesystem scan.
+
+    When resume mode is enabled, the most recent hashscan report is read,
+    its existing hash records are copied into the new report, and only the
+    remaining files are hashed.
     """
     skipped = 0
     latest_find = latest_report_file("find")
