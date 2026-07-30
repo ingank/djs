@@ -79,39 +79,59 @@ def emit_text(text: str, output: TextIO) -> None:
         output.flush()
 
 
-def emit_comment(text: str, output: TextIO) -> None:
+def emit_comment(text1: str, text2: str, output: TextIO) -> None:
     """
     Emit a comment line.
     """
-    emit_text(f"# {text}", output)
+    emit_text(f"# {text1:<15}{text2}", output)
 
 
 def emit_header(output: TextIO) -> None:
     """
     Write a standard report header.
     """
-    emit_comment(f"Timestamp: {START_TIMESTAMP}", output)
-    emit_comment(f"Directory: {START_DIR}", output)
-    emit_comment(f"Command:   {APP_NAME} {START_ARGS}", output)
+    emit_comment("Directory:", f"{START_DIR}", output)
+    emit_comment("Command:", f"{APP_NAME} {START_ARGS}", output)
+    emit_comment("Timestamp:", f"{START_TIMESTAMP}", output)
 
 
-def emit_found(count: int, output: TextIO) -> None:
-    emit_comment(f"Found:     {count} files", output)
+def emit_reading(path: Path, output: TextIO) -> None:
+    emit_comment("Reading:", f"{path}", output)
 
 
-def emit_skipped(count: int, output: TextIO) -> None:
-    emit_comment(f"Skipped:   {count} directories", output)
+def emit_scanning(output: TextIO) -> None:
+    emit_comment("Scanning:", "Filesystem", output)
 
 
-def emit_processed(count: int, output: TextIO) -> None:
-    emit_comment(f"Processed: {count} files", output)
+def emit_processing(count: int, output: TextIO) -> None:
+    emit_comment("Processing:", f"{count} files", output)
+
+
+def emit_resuming(count: int, output: TextIO) -> None:
+    emit_comment("Resuming:", f"{count} files", output)
+
+
+def emit_skipping(count: int, output: TextIO) -> None:
+    emit_comment("Skipping:", f"{count} directories", output)
+
+
+def emit_copied(count: int, output: TextIO) -> None:
+    emit_comment("Copied:", f"{count} lines", output)
+
+
+def emit_listed(count: int, output: TextIO) -> None:
+    emit_comment("Listed:", f"{count} files", output)
+
+
+def emit_hashed(count: int, output: TextIO) -> None:
+    emit_comment("Hashed:", f"{count} files", output)
 
 
 def emit_footer(output: TextIO) -> None:
     """
     Write a standard report footer.
     """
-    emit_comment(f"Status: OK", output)
+    emit_comment("Status:", "OK", output)
 
 
 def parse_filelist(filelist: Path) -> list[Path]:
@@ -325,17 +345,17 @@ def cmd_find(args):
     """
     report_file = report_file_name("find").open("w", encoding="utf-8")
     emit_header(report_file)
-
+    emit_scanning(report_file)
     files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
-    emit_found(len(files), report_file)
-    emit_skipped(len(skipped), report_file)
+    emit_skipping(len(skipped), report_file)
+    emit_processing(len(files), report_file)
 
     processed = 0
     for file in files:
         emit_text(f"{file}", report_file)
         processed += 1
 
-    emit_processed(processed, report_file)
+    emit_listed(processed, report_file)
     emit_footer(report_file)
     report_file.close()
 
@@ -347,65 +367,63 @@ def cmd_hashread(args):
 def cmd_hashscan(args):
     """
     Compute SHA-256 hashes for all selected audio files.
-
-    The hashes are written to the console and to a report file in the
-    format:
-
-        <HASH> <RELATIVE_PATH>
-
-    When --resume is specified, the most recent hashscan report is read,
-    all existing hash/path records are copied into the new report, and
-    only files that are not yet present are hashed.
     """
+    skipped = 0
+    latest_find = latest_report_file("find")
+    latest_hashscan = latest_report_file("hashscan")
+    rep_file = report_file_name("hashscan").open("w", encoding="utf-8")
+    emit_header(rep_file)
+
     if args.filelist:
         filelist = Path(args.filelist)
-        print(f"Reading file list: {filelist}")
+        emit_reading(filelist, rep_file)
         files = parse_filelist(filelist)
-        skipped = []
 
-    if args.lastfilelist:
-        previous = latest_report_file("find")
-
-        if previous is None:
+    elif args.lastfilelist:
+        if latest_find is None:
             raise RuntimeError("No previous find report found.")
 
-        print(f"Reading file list: {previous}")
-        files = parse_filelist(previous)
-        skipped = []
+        short = latest_find.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        files = parse_filelist(latest_find)
 
     else:
-        print("Scanning filesystem...")
+        emit_scanning(rep_file)
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
 
     previous_records: list[tuple[str, Path]] = []
 
     if args.resume:
-        previous = latest_report_file("hashscan")
-
-        if previous is None:
+        if latest_hashscan is None:
             raise RuntimeError("No previous hashscan report found.")
 
-        print(f"Resuming from: {previous}")
-
-        previous_records = parse_hashlist(previous)
+        short = latest_hashscan.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        previous_records = parse_hashlist(latest_hashscan)
         completed = {path for _, path in previous_records}
+        emit_resuming(len(completed), rep_file)
         files = [path for path in files if path not in completed]
 
-    rep_file = report_file_name("hashscan").open("w", encoding="utf-8")
+    if skipped:
+        emit_skipping(len(skipped), rep_file)
 
-    emit_header(
-        "hashlist",
-        rep_file,
-        len(previous_records) + len(files),
-        len(skipped),
-    )
+    emit_processing(len(files), rep_file)
+
+    copied = 0
+    hashed = 0
 
     for digest, path in previous_records:
         emit_text(f"{digest} {path}", rep_file)
+        copied += 1
 
     for path in files:
         emit_text(hash_record(path), rep_file)
+        hashed += 1
 
+    if copied:
+        emit_copied(copied, rep_file)
+
+    emit_hashed(hashed, rep_file)
     emit_footer(rep_file)
     rep_file.close()
 
