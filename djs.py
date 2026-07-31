@@ -228,37 +228,6 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
     return (found_files, skipped_dirs)
 
 
-def collect_stats(files: list[Path]) -> dict:
-    """
-    Collect summary statistics for a sequence of files.
-
-    Counts the total number of files, occurrences of each file
-    extension, and extension frequencies grouped by parent directory.
-
-    Returns a dictionary with the following keys:
-
-    - "file_count": total number of files
-    - "extensions": mapping of file extensions to their counts
-    - "directories": mapping of parent directories to extension-count
-      mappings
-    """
-    ext_counter = Counter()
-    dir_counter = defaultdict(Counter)
-
-    for path in files:
-        ext_counter[path.suffix.lower()] += 1
-        dir_counter[path.parent][path.suffix.lower()] += 1
-
-    return {
-        "file_count": len(files),
-        "extensions": dict(ext_counter),
-        "directories": {
-            directory: dict(counter)
-            for directory, counter in dir_counter.items()
-        },
-    }
-
-
 def sha256(file: Path) -> str:
     """
     Compute a deterministic SHA-256 hash of the decoded audio stream by
@@ -469,25 +438,42 @@ def cmd_stats(args):
     Displays the total file count, counts by extension, and a per-directory
     distribution of audio formats.
     """
+    rep_file = report_file_name("stats").open("w", encoding="utf-8")
+    emit_header(rep_file)
+    skipped = []
+
     if args.filelist:
         filelist = Path(args.filelist)
-        print(f"Reading file list: {filelist}")
+        emit_reading(filelist, rep_file)
         files = parse_filelist(filelist)
-        skipped = []
 
     if args.hashlist:
         hashlist = Path(args.hashliist)
-        print(f"Reading hash list: {hashlist}")
-        skipped = []
+        emit_reading(hashlist, rep_file)
 
     if not args.filelist and not args.hashlist:
-        print("Scanning filesystem...")
-        (files, skipped) = find_files(START_DIR, AUDIO_EXTENSIONS)
+        emit_scanning(rep_file)
+        files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
 
-    rep_file = report_file_name("stats").open("w", encoding="utf-8")
-    stats = collect_stats(files)
+    # collect stats
+    ext_counter = Counter()
+    dir_counter = defaultdict(Counter)
+
+    for path in files:
+        ext_counter[path.suffix.lower()] += 1
+        dir_counter[path.parent][path.suffix.lower()] += 1
+
+    stats = {
+        "file_count": len(files),
+        "extensions": dict(ext_counter),
+        "directories": {
+            directory: dict(counter)
+            for directory, counter in dir_counter.items()
+        },
+    }
+
+    # emit stats
     dir_count = len(stats['directories'])
-    emit_header("stats", rep_file, None, None)
     emit_text(f"Processed audio files: {stats['file_count']}", rep_file)
 
     for ext, count in sorted(stats["extensions"].items()):
