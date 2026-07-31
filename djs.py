@@ -17,7 +17,6 @@ from typing import TextIO
 
 APP_NAME = "djs.py"
 APP_VERSION = "v0.01"
-NOSCAN_FILE = ".noscan"
 AUDIO_FLAC = ("flac",)
 AUDIO_LOSSLESS = ("wav", "aiff", "aifc")
 AUDIO_LOSSY = ("mp3",)
@@ -196,7 +195,7 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
     """
     Recursively discover files below *start_dir*.
 
-    Directories containing a '.noscan' marker file are skipped entirely,
+    Directories whose name begins with '.' are excluded from the traversal,
     including all of their subdirectories.
 
     Performs a depth-first traversal using os.scandir() for efficiency.
@@ -205,15 +204,14 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
     """
     allowed_exts = {"." + ext.lower().lstrip(".") for ext in extensions}
     found_files: list[Path] = []
-    skiped_dirs: list[Path] = []
+    skipped_dirs: list[Path] = []
     dirs_to_visit: list[Path] = [start_dir]
 
     while dirs_to_visit:
         current_dir = dirs_to_visit.pop()
 
-        # Skip this directory and all descendants.
-        if (current_dir / NOSCAN_FILE).is_file():
-            skiped_dirs.append(current_dir.relative_to(start_dir))
+        if current_dir != start_dir and current_dir.name.startswith("."):
+            skipped_dirs.append(current_dir.relative_to(start_dir))
             continue
 
         with os.scandir(current_dir) as entries:
@@ -226,8 +224,8 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
                         found_files.append(path.relative_to(start_dir))
 
     found_files.sort()
-    skiped_dirs.sort()
-    return (found_files, skiped_dirs)
+    skipped_dirs.sort()
+    return (found_files, skipped_dirs)
 
 
 def collect_stats(files: list[Path]) -> dict:
