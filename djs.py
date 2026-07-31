@@ -798,20 +798,12 @@ def main():
 
     parser = build_parser()
 
-    #
-    # Bei Aufruf ohne Kommando die Hilfe anzeigen.
-    #
     if len(sys.argv) == 1:
         parser.print_help()
         return 0
 
     args = parser.parse_args()
-
-    #
-    # Das ausgewählte Kommando ausführen.
-    #
     args.func(args)
-
     return 0
 
 
