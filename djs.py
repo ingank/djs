@@ -92,6 +92,7 @@ def emit_header(output: TextIO) -> None:
     emit_comment("Directory:", f"{START_DIR}", output)
     emit_comment("Command:", f"{APP_NAME} {START_ARGS}", output)
     emit_comment("Timestamp:", f"{START_TIMESTAMP}", output)
+    emit_comment("Extensions:", f"{", ".join(AUDIO_EXTENSIONS)}", output)
 
 
 def emit_reading(path: Path, output: TextIO) -> None:
