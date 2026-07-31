@@ -514,7 +514,7 @@ def cmd_test(args):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="djs.py",
-        description="djs - DJ System (audio and hash utilities)",
+        description=f"DJS // DJ-Suite (audio and hash utilities) // {APP_VERSION}",
     )
 
     subparsers = parser.add_subparsers(
