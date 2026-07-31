@@ -225,6 +225,8 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
                     if path.suffix.lower() in allowed_exts:
                         found_files.append(path.relative_to(start_dir))
 
+    found_files.sort()
+    skiped_dirs.sort()
     return (found_files, skiped_dirs)
 
 
