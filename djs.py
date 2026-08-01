@@ -502,10 +502,6 @@ def cmd_tagexport(args):
     print("Dummy: tagexport")
 
 
-def cmd_test(args):
-    print("Dummy: test")
-
-
 # ===========================================================================
 # cli parser
 # ===========================================================================
@@ -746,30 +742,6 @@ def build_parser():
     )
     p.add_argument("hashfile", help="hash file")
     p.set_defaults(func=cmd_tagexport)
-
-    # -----------------------------------------------------------------------
-    # test
-    # -----------------------------------------------------------------------
-
-    p = subparsers.add_parser(
-        "test",
-        help="Run program function tests.",
-        description="Run program function tests.",
-    )
-    group = p.add_mutually_exclusive_group()
-    group.add_argument(
-        "-fl",
-        "--filelist",
-        metavar="FILE",
-        help="read file list from FILE",
-    )
-    group.add_argument(
-        "-hl",
-        "--hashlist",
-        metavar="FILE",
-        help="read hash list from FILE",
-    )
-    p.set_defaults(func=cmd_test)
 
     return parser
 
