@@ -502,6 +502,24 @@ def cmd_tagexport(args):
     print("Dummy: tagexport")
 
 
+def cmd_helpall(args):
+    """
+    Display the main help followed by the help text
+    of every available subcommand.
+    """
+    parser = args.parser
+    parser.print_help()
+
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, subparser in action.choices.items():
+                print()
+                print("-" * (len(name) + 9))
+                print("command:", name)
+                print("-" * (len(name) + 9))
+                subparser.print_help()
+
+
 # ===========================================================================
 # cli parser
 # ===========================================================================
@@ -742,6 +760,17 @@ def build_parser():
     )
     p.add_argument("hashfile", help="hash file")
     p.set_defaults(func=cmd_tagexport)
+
+    # -----------------------------------------------------------------------
+    # helpall
+    # -----------------------------------------------------------------------
+
+    p = subparsers.add_parser(
+        "helpall",
+        help="Show help for all commands.",
+        description="Show help for all commands.",
+    )
+    p.set_defaults(func=cmd_helpall, parser=parser)
 
     return parser
 
