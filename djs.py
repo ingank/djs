@@ -441,6 +441,8 @@ def cmd_stats(args):
     """
     rep_file = report_file_name("stats").open("w", encoding="utf-8")
     emit_header(rep_file)
+    latest_find = latest_report_file("find")
+    latest_hashscan = latest_report_file("hashscan")
     skipped = []
 
     if args.filelist:
@@ -448,11 +450,28 @@ def cmd_stats(args):
         emit_reading(filelist, rep_file)
         files = parse_filelist(filelist)
 
-    if args.hashlist:
+    elif args.hashlist:
         hashlist = Path(args.hashliist)
         emit_reading(hashlist, rep_file)
 
-    if not args.filelist and not args.hashlist:
+    elif args.lastfilelist:
+        if latest_find is None:
+            raise RuntimeError("No previous find report found.")
+
+        short = latest_find.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        files = parse_filelist(latest_find)
+
+    elif args.lasthashlist:
+        if latest_hashscan is None:
+            raise RuntimeError("No previous hashscan report found.")
+
+        short = latest_hashscan.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        data = parse_hashlist(latest_hashscan)
+        files = {path for _, path in data}
+
+    else:
         emit_scanning(rep_file)
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
 
@@ -730,23 +749,31 @@ def build_parser():
         help="Detect and count audio files.",
         description="Detect and count audio files.",
     )
-
-    group = p.add_mutually_exclusive_group()
-
-    group.add_argument(
+    filelist_group = p.add_mutually_exclusive_group()
+    filelist_group.add_argument(
         "-fl",
         "--filelist",
         metavar="FILE",
         help="read file list from FILE",
     )
-
-    group.add_argument(
+    filelist_group.add_argument(
         "-hl",
         "--hashlist",
         metavar="FILE",
         help="read hash list from FILE",
     )
-
+    filelist_group.add_argument(
+        "-lfl",
+        "--lastfilelist",
+        action="store_true",
+        help="use the last generated file list",
+    )
+    filelist_group.add_argument(
+        "-lhl",
+        "--lasthashlist",
+        action="store_true",
+        help="use the last generated hash list",
+    )
     p.set_defaults(func=cmd_stats)
 
     # -----------------------------------------------------------------------
