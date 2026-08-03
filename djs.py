@@ -453,6 +453,8 @@ def cmd_stats(args):
     elif args.hashlist:
         hashlist = Path(args.hashliist)
         emit_reading(hashlist, rep_file)
+        data = parse_hashlist(hashlist)
+        files = {path for _, path in data}
 
     elif args.lastfilelist:
         if latest_find is None:
