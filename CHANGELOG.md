@@ -2,36 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
-## [v0.03] - 2026-08-03
-
-### Summary
-This release updates `djs.py` to v0.03 and includes small feature additions, bug fixes, and stability improvements to report generation and hash scanning.
-
-### Added
-- APP_VERSION bumped to `v0.03`.
-- New `--report-format` option allowing `text` or `json` output for reports.
-- Additional unit tests for `find_files()` and `hashscan` workflows to cover resume and last-filelist behaviors.
-- Logging improvements: more consistent run metadata in report headers and an optional verbose mode for debugging runs.
-
-### Changed
-- Resume behavior for `hashscan` refined: existing records are preserved and timestamps are preserved where present; hashing skips already-recorded files more reliably.
-- Report generation now emits consistent JSON when `--report-format json` is selected and preserves the same metadata fields as the text reports.
-- Minor CLI help and description improvements to clarify new flags and examples.
-- Documentation updated to note the new report format option.
-
-### Fixed
-- Typo fixed in `cmd_stats` referencing `args.hashliist` (now `args.hashlist`).
-- Fixed an edge-case crash when encountering circular symlinks during file discovery.
-
-### Notes / Migration
-- No breaking changes; users relying on the previous output format can continue to use the default `text` report format. If you depend on exact report text formatting, review JSON output for the equivalent fields.
-
----
-
 ## [v0.02] - 2026-07-31
 
 ### Summary
-This release updates `djs.py` to v0.02 and introduces improved report generation, enhanced hash scanning (including resume support and using last-generated file lists), more structured CLI options,[...]
+This release updates `djs.py` to v0.02 and introduces improved report generation, enhanced hash scanning (including resume support and using last-generated file lists), more structured CLI options, and refined file discovery behavior. Also adds a small .gitignore entry for repository metadata.
 
 ### Added
 - APP_VERSION bumped to `v0.02`.
