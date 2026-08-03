@@ -563,10 +563,34 @@ def build_parser():
 
     p = subparsers.add_parser(
         "copy",
-        help="Copy files based on a hash file.",
-        description="Copy files based on a hash file.",
+        help="Copy files based on a file.",
+        description="Copy files based on a file.",
     )
-    p.add_argument("hashfile", help="hash file")
+    filelist_group = p.add_mutually_exclusive_group(required=True)
+    filelist_group.add_argument(
+        "-fl",
+        "--filelist",
+        metavar="FILE",
+        help="read file list from FILE",
+    )
+    filelist_group.add_argument(
+        "-hl",
+        "--hashlist",
+        metavar="FILE",
+        help="read hash list from FILE",
+    )
+    filelist_group.add_argument(
+        "-lfl",
+        "--lastfilelist",
+        action="store_true",
+        help="use the last generated file list",
+    )
+    filelist_group.add_argument(
+        "-lhl",
+        "--lasthashlist",
+        action="store_true",
+        help="use the last generated hash list",
+    )
     p.set_defaults(func=cmd_copy)
 
     # -----------------------------------------------------------------------
