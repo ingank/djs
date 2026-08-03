@@ -3,7 +3,7 @@
 djs.py
 """
 
-
+import shutil
 import argparse
 import datetime
 import hashlib
@@ -38,7 +38,7 @@ def stage_directory_name(command: str) -> Path:
     The directory name is derived from the current working directory,
     the command name, and the startup timestamp.
     """
-    return Path(START_DIR / f"{command}__{START_TIMESTAMP}")
+    return Path(START_DIR / f".{command}__{START_TIMESTAMP}")
 
 
 def report_file_name(command: str) -> Path:
@@ -99,6 +99,10 @@ def emit_reading(path: Path, output: TextIO) -> None:
     emit_comment("Reading:", f"{path}", output)
 
 
+def emit_mkdir(path: Path, output: TextIO) -> None:
+    emit_comment("Mkdir:", f"{path}", output)
+
+
 def emit_scanning(output: TextIO) -> None:
     emit_comment("Scanning:", "Filesystem", output)
 
@@ -115,8 +119,12 @@ def emit_skipping(count: int, output: TextIO) -> None:
     emit_comment("Skipping:", f"{count} directories", output)
 
 
-def emit_copied(count: int, output: TextIO) -> None:
+def emit_copied_lines(count: int, output: TextIO) -> None:
     emit_comment("Copied:", f"{count} lines", output)
+
+
+def emit_copied_files(count: int, output: TextIO) -> None:
+    emit_comment("Copied:", f"{count} files", output)
 
 
 def emit_listed(count: int, output: TextIO) -> None:
@@ -284,8 +292,57 @@ def sha256(file: Path) -> str:
 # ===========================================================================
 
 
-def cmd_copy(args):
-    print(f"Dummy: copy ({args.hashfile})")
+def cmd_copy(args) -> None:
+    rep_file = report_file_name("copy").open("w", encoding="utf-8")
+    emit_header(rep_file)
+    latest_find = latest_report_file("find")
+    latest_hashscan = latest_report_file("hashscan")
+
+    if args.filelist:
+        filelist = Path(args.filelist)
+        emit_reading(filelist, rep_file)
+        files = parse_filelist(filelist)
+
+    if args.hashlist:
+        hashlist = Path(args.hashliist)
+        emit_reading(hashlist, rep_file)
+        data = parse_hashlist(hashlist)
+        files = {path for _, path in data}
+
+    if args.lastfilelist:
+        if latest_find is None:
+            raise RuntimeError("No previous find report found.")
+
+        short = latest_find.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        files = parse_filelist(latest_find)
+
+    if args.lasthashlist:
+        if latest_hashscan is None:
+            raise RuntimeError("No previous hashscan report found.")
+
+        short = latest_hashscan.relative_to(START_DIR)
+        emit_reading(short, rep_file)
+        data = parse_hashlist(latest_hashscan)
+        files = [path for _, path in data]
+
+    emit_processing(len(files), rep_file)
+    stage_dir = stage_directory_name("copy")
+    emit_mkdir(stage_dir.relative_to(START_DIR), rep_file)
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+
+    for relative_path in files:
+        source = Path(START_DIR / relative_path)
+        destination = Path(START_DIR / stage_dir / relative_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        emit_text(f"{source}", rep_file)
+        copied += 1
+
+    emit_copied_files(copied, rep_file)
+    emit_footer(rep_file)
+    rep_file.close()
 
 
 def cmd_diff(args):
@@ -401,7 +458,7 @@ def cmd_hashscan(args):
         hashed += 1
 
     if copied:
-        emit_copied(copied, rep_file)
+        emit_copied_lines(copied, rep_file)
 
     emit_hashed(hashed, rep_file)
     emit_footer(rep_file)
