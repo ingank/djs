@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [v0.03] - 2026-08-03
+
+### Summary
+Version `v0.03` bumps the runtime version and includes a small set of bug fixes and cleanup identified after the `v0.02` release. The changes are narrowly scoped and safe to apply in-place.
+
+### Changed
+- Bumped `APP_VERSION` in `djs.py` to `v0.03`.
+
+### Fixed
+- Corrected a name typo where `args.hashliist` was referenced instead of `args.hashlist` in `cmd_copy` and `cmd_stats` (would raise a `NameError` when using `--hashlist`).
+- Fixed staging path construction in `cmd_copy` so files are copied into the staging directory correctly (use `stage_dir / relative_path` rather than duplicating `START_DIR`).
+
+### Notes
+- These fixes are non-functional regressions and do not change command semantics. If you want, I can apply the code fixes to `djs.py` now.
+
+---
+
 ## [v0.02] - 2026-07-31
 
 ### Summary
