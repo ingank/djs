@@ -24,6 +24,7 @@ AUDIO_EXTENSIONS = AUDIO_FLAC + AUDIO_LOSSY + AUDIO_LOSSLESS
 START_TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 START_DIR = Path.cwd().resolve()
 START_ARGS = " ".join(sys.argv[1:])
+SEP = f"{os.sep}"
 
 
 # ===========================================================================
@@ -41,7 +42,7 @@ def stage_directory_name(command: str) -> Path:
     return Path(START_DIR / f".{command}__{START_TIMESTAMP}")
 
 
-def report_file_name(command: str) -> Path:
+def report_file_name(command: str, format: str) -> Path:
     """
     Return the path of the report file for *command*.
 
@@ -49,18 +50,12 @@ def report_file_name(command: str) -> Path:
     the command name, and the startup timestamp, using a '.txt'
     extension.
     """
-    return Path(START_DIR / f"{command}__{START_TIMESTAMP}.txt")
+    return Path(START_DIR / f"{command}__{START_TIMESTAMP}__{format}.txt")
 
 
-def latest_report_file(command: str) -> Path | None:
-    """
-    Return the latest report file for *command* in START_DIR.
-
-    Returns None if no matching report exists.
-    """
-    files = START_DIR.glob(f"{command}__*.txt")
-    latest = max(files, default=None, key=lambda p: p.name)
-
+def latest_file(fmt: str) -> Path | None:
+    files = START_DIR.glob(f"*__*__{fmt}.txt")
+    latest = max(files, key=lambda p: p.name.rsplit("__", 2)[1], default=None)
     return latest
 
 
@@ -100,7 +95,7 @@ def emit_reading(path: Path, output: TextIO) -> None:
 
 
 def emit_staging_area(path: Path, output: TextIO) -> None:
-    emit_comment("Staging Area:", f"{path}", output)
+    emit_comment("Staging Area:", f".{SEP}{path}", output)
 
 
 def emit_scanning(output: TextIO) -> None:
@@ -293,10 +288,11 @@ def sha256(file: Path) -> str:
 
 
 def cmd_copy(args) -> None:
-    rep_file = report_file_name("copy").open("w", encoding="utf-8")
+    latest_find = latest_file("fl")
+    latest_hashscan = latest_file("hl")
+
+    rep_file = report_file_name("copy", "log").open("w", encoding="utf-8")
     emit_header(rep_file)
-    latest_find = latest_report_file("find")
-    latest_hashscan = latest_report_file("hashscan")
 
     if args.filelist:
         filelist = Path(args.filelist)
@@ -370,7 +366,7 @@ def cmd_find(args):
     (found, skipped, processed) followed by the list of all discovered
     files.
     """
-    report_file = report_file_name("find").open("w", encoding="utf-8")
+    report_file = report_file_name("find", "fl").open("w", encoding="utf-8")
     emit_header(report_file)
     emit_scanning(report_file)
     files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
@@ -405,10 +401,13 @@ def cmd_hashscan(args):
     its existing hash records are copied into the new report, and only the
     remaining files are hashed.
     """
+    latest_find = latest_file("fl")
+    latest_hashscan = latest_file("hl")
     skipped = 0
-    latest_find = latest_report_file("find")
-    latest_hashscan = latest_report_file("hashscan")
-    rep_file = report_file_name("hashscan").open("w", encoding="utf-8")
+    copied = 0
+    hashed = 0
+
+    rep_file = report_file_name("hashscan", "hl").open("w", encoding="utf-8")
     emit_header(rep_file)
 
     if args.filelist:
@@ -445,9 +444,6 @@ def cmd_hashscan(args):
         emit_skipping(len(skipped), rep_file)
 
     emit_processing(len(files), rep_file)
-
-    copied = 0
-    hashed = 0
 
     for digest, path in previous_records:
         emit_text(f"{digest} {path}", rep_file)
@@ -496,11 +492,12 @@ def cmd_stats(args):
     Displays the total file count, counts by extension, and a per-directory
     distribution of audio formats.
     """
-    rep_file = report_file_name("stats").open("w", encoding="utf-8")
-    emit_header(rep_file)
-    latest_find = latest_report_file("find")
-    latest_hashscan = latest_report_file("hashscan")
+    latest_find = latest_file("fl")
+    latest_hashscan = latest_file("hl")
     skipped = []
+
+    rep_file = report_file_name("stats", "log").open("w", encoding="utf-8")
+    emit_header(rep_file)
 
     if args.filelist:
         filelist = Path(args.filelist)
@@ -565,12 +562,12 @@ def cmd_stats(args):
             f"{ext} ({count})"
             for ext, count in sorted(stats["directories"][directory].items())
         )
-        emit_text(f"   .\\{directory}: {line}", rep_file)
+        emit_text(f"   .{SEP}{directory}: {line}", rep_file)
 
     if skipped:
         emit_text(f"Skipped directories: {len(skipped)}", rep_file)
         for directory in sorted(skipped):
-            emit_text(f"   .\\{directory}", rep_file)
+            emit_text(f"   .{SEP}{directory}", rep_file)
 
     emit_footer(rep_file)
     rep_file.close()
