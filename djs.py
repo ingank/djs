@@ -183,18 +183,6 @@ def parse_hashlist(hashlist: Path) -> list[tuple[str, Path]]:
     return records
 
 
-def hash_record(file: Path) -> str:
-    """
-    Return the hash record for *file*.
-
-    Computes the SHA-256 hash of the normalized audio stream and returns
-    a single text line in the format:
-
-        <SHA256> <RELATIVE_PATH>
-    """
-    return f"{sha256(START_DIR / file)} {file}"
-
-
 def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list[Path]]:
     """
     Recursively discover files below *start_dir*.
@@ -450,7 +438,7 @@ def cmd_hashscan(args):
         copied += 1
 
     for path in files:
-        emit_text(hash_record(path), rep_file)
+        emit_text(f"{sha256(START_DIR / path)} {path}", rep_file)
         hashed += 1
 
     if copied:
@@ -494,7 +482,7 @@ def cmd_stats(args):
     """
     latest_find = latest_file("fl")
     latest_hashscan = latest_file("hl")
-    skipped = []
+    skipped = 0
 
     rep_file = report_file_name("stats", "log").open("w", encoding="utf-8")
     emit_header(rep_file)
