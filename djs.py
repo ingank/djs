@@ -287,13 +287,13 @@ def cmd_copy(args) -> None:
         emit_reading(filelist, rep_file)
         files = parse_filelist(filelist)
 
-    if args.hashlist:
+    elif args.hashlist:
         hashlist = Path(args.hashliist)
         emit_reading(hashlist, rep_file)
         data = parse_hashlist(hashlist)
         files = {path for _, path in data}
 
-    if args.lastfilelist:
+    elif args.lastfilelist:
         if latest_find is None:
             raise RuntimeError("No previous find report found.")
 
@@ -301,7 +301,7 @@ def cmd_copy(args) -> None:
         emit_reading(short, rep_file)
         files = parse_filelist(latest_find)
 
-    if args.lasthashlist:
+    elif args.lasthashlist:
         if latest_hashscan is None:
             raise RuntimeError("No previous hashscan report found.")
 
@@ -309,6 +309,11 @@ def cmd_copy(args) -> None:
         emit_reading(short, rep_file)
         data = parse_hashlist(latest_hashscan)
         files = [path for _, path in data]
+
+    else:
+        emit_scanning(rep_file)
+        files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
+        emit_skipping(len(skipped), rep_file)
 
     emit_processing(len(files), rep_file)
     stage_dir = stage_directory_name("copy")
@@ -608,7 +613,7 @@ def build_parser():
         help="Copy files based on a file.",
         description="Copy files based on a file.",
     )
-    filelist_group = p.add_mutually_exclusive_group(required=True)
+    filelist_group = p.add_mutually_exclusive_group()
     filelist_group.add_argument(
         "-fl",
         "--filelist",
