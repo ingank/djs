@@ -99,8 +99,8 @@ def emit_reading(path: Path, output: TextIO) -> None:
     emit_comment("Reading:", f"{path}", output)
 
 
-def emit_mkdir(path: Path, output: TextIO) -> None:
-    emit_comment("Mkdir:", f"{path}", output)
+def emit_staging_area(path: Path, output: TextIO) -> None:
+    emit_comment("Staging Area:", f"{path}", output)
 
 
 def emit_scanning(output: TextIO) -> None:
@@ -328,7 +328,7 @@ def cmd_copy(args) -> None:
 
     emit_processing(len(files), rep_file)
     stage_dir = stage_directory_name("copy")
-    emit_mkdir(stage_dir.relative_to(START_DIR), rep_file)
+    emit_staging_area(stage_dir.relative_to(START_DIR), rep_file)
     stage_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
 
@@ -337,7 +337,7 @@ def cmd_copy(args) -> None:
         destination = Path(START_DIR / stage_dir / relative_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
-        emit_text(f"{source}", rep_file)
+        emit_text(f"{relative_path}", rep_file)
         copied += 1
 
     emit_copied_files(copied, rep_file)
