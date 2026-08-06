@@ -17,6 +17,7 @@ from typing import TextIO
 
 APP_NAME = "djs.py"
 APP_VERSION = "v0.04"
+APP_DIR = Path(__file__).resolve().parent
 AUDIO_FLAC = ("flac",)
 AUDIO_LOSSLESS = ("wav", "aiff", "aifc")
 AUDIO_LOSSY = ("mp3",)
@@ -24,6 +25,7 @@ AUDIO_EXTENSIONS = AUDIO_FLAC + AUDIO_LOSSY + AUDIO_LOSSLESS
 START_TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 START_DIR = Path.cwd().resolve()
 START_ARGS = " ".join(sys.argv[1:])
+NO_COVER = Path(APP_DIR / "no_cover.png")
 SEP = f"{os.sep}"
 
 
@@ -268,6 +270,73 @@ def sha256(file: Path) -> str:
                 f"{err_out.decode('utf-8', errors='ignore')}"
             )
     return hasher.hexdigest()
+
+
+def ffmpeg_encode(
+        scr: Path,
+        dst: Path,
+        pic_idx: int | None,
+        modus: str,
+) -> list[str]:
+
+    cmd = [
+        "ffmpeg",
+        "-v", "error",
+        "-i", str(scr),
+    ]
+
+    # No embedded cover found: use external placeholder image
+    if pic_idx is None:
+        cmd += [
+            "-i", str(NO_COVER)
+        ]
+
+    # Preserve all metadata; mapping audiostream
+    cmd += [
+        "-map_metadata", "0",
+        "-map", "0:a:0"
+    ]
+
+    # Use external placeholder cover
+    if pic_idx is None:
+        cmd += [
+            "-map", "1:v:0",
+            "-vf", "scale=600:600"
+        ]
+    # Use embedded cover: center-crop to square and resize
+    else:
+        cmd += [
+            "-map", f"0:{pic_idx}",
+            "-vf", "crop='min(iw,ih)':'min(iw,ih)':'(iw-min(iw,ih))/2':'(ih-min(iw,ih))/2',scale=600:600"
+        ]
+
+    cmd += [
+        "-disposition:v:0", "attached_pic"
+    ]
+
+    if modus == "flac":
+        audio_args = [
+            "-c:a", "copy"
+        ]
+
+    elif modus == "lossless":
+        audio_args = [
+            "-c:a", "flac",
+        ]
+
+    elif modus == "lossy":
+        audio_args = [
+            "-c:a", "flac",
+            "-sample_fmt", "s16",
+        ]
+
+    cmd += [
+        *audio_args,
+        "-c:v", "mjpeg",
+        "-y", str(dst)
+    ]
+
+    return cmd
 
 
 # ===========================================================================
