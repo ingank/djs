@@ -16,7 +16,7 @@ from typing import TextIO
 
 
 APP_NAME = "djs.py"
-APP_VERSION = "v0.03"
+APP_VERSION = "v0.04"
 AUDIO_FLAC = ("flac",)
 AUDIO_LOSSLESS = ("wav", "aiff", "aifc")
 AUDIO_LOSSY = ("mp3",)
