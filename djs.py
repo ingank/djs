@@ -276,7 +276,6 @@ def ffmpeg_encode(
         scr: Path,
         dst: Path,
         pic_idx: int | None,
-        modus: str,
 ) -> list[str]:
 
     cmd = [
@@ -305,30 +304,40 @@ def ffmpeg_encode(
         ]
     # Use embedded cover: center-crop to square and resize
     else:
+        crop = "crop='min(iw,ih)':"
+        crop += "'min(iw,ih)':"
+        crop += "'(iw-min(iw,ih))/2':"
+        crop += "'(ih-min(iw,ih))/2',"
+        crop += "scale=600:600"
         cmd += [
             "-map", f"0:{pic_idx}",
-            "-vf", "crop='min(iw,ih)':'min(iw,ih)':'(iw-min(iw,ih))/2':'(ih-min(iw,ih))/2',scale=600:600"
+            "-vf", crop
         ]
 
     cmd += [
         "-disposition:v:0", "attached_pic"
     ]
 
-    if modus == "flac":
+    ext = scr.suffix.lower().lstrip(".")
+
+    if ext in AUDIO_FLAC:
         audio_args = [
             "-c:a", "copy"
         ]
 
-    elif modus == "lossless":
+    elif ext in AUDIO_LOSSLESS:
         audio_args = [
             "-c:a", "flac",
         ]
 
-    elif modus == "lossy":
+    elif ext in AUDIO_LOSSY:
         audio_args = [
             "-c:a", "flac",
             "-sample_fmt", "s16",
         ]
+
+    else:
+        raise RuntimeError()
 
     cmd += [
         *audio_args,
