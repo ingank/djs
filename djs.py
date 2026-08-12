@@ -3,13 +3,16 @@
 djs.py
 """
 
+import re
 import shutil
 import argparse
 import datetime
 import hashlib
 import subprocess
+import threading
 import sys
 import os
+import json
 from pathlib import Path
 from collections import Counter, defaultdict
 from typing import TextIO
@@ -222,54 +225,223 @@ def find_files(start_dir: Path, extensions: list[str]) -> tuple[list[Path], list
     return (found_files, skipped_dirs)
 
 
-def sha256(file: Path) -> str:
+def analyze_audio(file: Path, mode: int) -> tuple[str | None, float | None, float | None]:
     """
-    Compute a deterministic SHA-256 hash of the decoded audio stream by
-    hashing normalized PCM data produced by ffmpeg.
+    Analyze an audio file using FFmpeg.
+
+    The analysis mode determines which measurements are performed:
+
+        1: Calculate only the SHA-256 hash.
+           The hash is computed from normalized PCM audio converted to
+           96 kHz, stereo, signed 24-bit little-endian PCM.
+
+        2: Calculate only Integrated Loudness (LUFS) and
+           Loudness Range (LRA) using FFmpeg's EBU R 128 / ebur128
+           filter.
+
+        3: Calculate the SHA-256 hash, Integrated Loudness (LUFS),
+           and Loudness Range (LRA) in a single FFmpeg pass.
+           The decoded audio is split into separate hash and
+           loudness analysis paths.
+
+    Args:
+        file: Path to the input audio file.
+        mode: Analysis mode:
+            1 for SHA-256 only,
+            2 for LUFS/LRA only,
+            3 for all measurements.
+
+    Returns:
+        A tuple containing:
+            - SHA-256 hex digest, or None if not requested.
+            - Integrated Loudness in LUFS, or None if not requested.
+            - Loudness Range (LRA) in LU, or None if not requested.
 
     Raises:
-        RuntimeError: If ffmpeg fails to decode or process the audio.
+        RuntimeError: If the analysis mode is invalid or FFmpeg
+            fails to process the input file.
     """
-    file = Path(file)
-    cmd = [
-        "ffmpeg", "-v", "error",
-        "-i", str(file),
-        "-map", "0:a:0",
-        "-vn",
-        "-f", "s24le",
-        "-acodec", "pcm_s24le",
-        "-ar", "96000",
-        "-ac", "2",
-        "-"
-    ]
-    hasher = hashlib.sha256()
+    if mode == 1:
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i", str(file),
+            "-map", "0:a:0",
+            "-vn",
+            "-f", "s24le",
+            "-acodec", "pcm_s24le",
+            "-ar", "96000",
+            "-ac", "2",
+            "-",
+        ]
+
+    elif mode == 2:
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i", str(file),
+            "-map", "0:a:0",
+            "-af", "ebur128=framelog=quiet",
+            "-f", "null",
+            "-",
+        ]
+
+    elif mode == 3:
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i", str(file),
+            "-filter_complex",
+            (
+                "[0:a:0]asplit=2[loud][hash];"
+                "[loud]ebur128=framelog=quiet,anullsink;"
+                "[hash]anull[hashout]"
+            ),
+            "-map", "[hashout]",
+            "-vn",
+            "-f", "s24le",
+            "-acodec", "pcm_s24le",
+            "-ar", "96000",
+            "-ac", "2",
+            "-",
+        ]
+
+    else:
+        raise RuntimeError(f"Unknown analyze mode: {mode}")
+
     proc = subprocess.Popen(
+        ffmpeg_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    assert proc.stdout is not None
+    assert proc.stderr is not None
+
+    hasher = hashlib.sha256() if mode in (1, 3) else None
+    stderr_chunks: list[bytes] = []
+
+    def drain_stderr() -> None:
+
+        while True:
+
+            chunk = proc.stderr.read(64 * 1024)
+
+            if not chunk:
+                break
+
+            stderr_chunks.append(chunk)
+
+    stderr_thread = threading.Thread(
+        target=drain_stderr,
+        daemon=True,
+    )
+
+    stderr_thread.start()
+
+    try:
+
+        if hasher is not None:
+            # HASH / ALL: PCM
+            for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b""):
+                hasher.update(chunk)
+
+        else:
+            # LOUDNESS:
+            for chunk in iter(lambda: proc.stdout.read(1024 * 1024),  b""):
+                pass
+
+    finally:
+
+        proc.stdout.close()
+
+    ret = proc.wait()
+    stderr_thread.join()
+    stderr = b"".join(stderr_chunks)
+
+    if ret != 0:
+
+        raise RuntimeError(
+            f"ffmpeg failed with code {ret} for {file}\n"
+            f"{stderr.decode('utf-8', errors='replace')}"
+        )
+
+    digest = hasher.hexdigest() if hasher is not None else None
+
+    lufs = None
+    lra = None
+
+    if mode in (2, 3):
+
+        stderr_text = stderr.decode("utf-8", errors="replace")
+        in_summary = False
+
+        for line in stderr_text.splitlines():
+
+            if "Summary:" in line:
+                in_summary = True
+                continue
+
+            if not in_summary:
+                continue
+
+            if "I:" in line and "LUFS" in line:
+
+                match = re.search(r"I:\s*(-?\d+(?:\.\d+)?)\s*LUFS", line)
+
+                if match:
+                    lufs = float(match.group(1))
+
+            elif "LRA:" in line and "LU" in line:
+
+                match = re.search(r"LRA:\s*(-?\d+(?:\.\d+)?)\s*LU", line)
+
+                if match:
+                    lra = float(match.group(1))
+
+    return digest, lufs, lra
+
+
+def ffprobe_json(path: Path) -> dict:
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-hide_banner",
+        "-print_format", "json",
+        "-show_format",
+        "-show_streams",
+        str(path),
+    ]
+
+    proc = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        text=False  # -> stdout/stderr as bytes
     )
-    assert proc.stdout is not None
-    try:
-        for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b""):
-            hasher.update(chunk)
-    finally:
-        try:
-            proc.stdout.close()
-        except Exception:
-            pass
-        ret = proc.wait()
-        err_out = b""
-        if proc.stderr is not None:
-            try:
-                err_out = proc.stderr.read()
-            finally:
-                proc.stderr.close()
-        if ret != 0:
-            raise RuntimeError(
-                f"ffmpeg hashing failed with code {ret} for {file}\n"
-                f"{err_out.decode('utf-8', errors='ignore')}"
-            )
-    return hasher.hexdigest()
+
+    assert proc.returncode == 0
+    stdout_str = proc.stdout.decode("utf-8", errors="replace")
+    return json.loads(stdout_str)
+
+
+def first_audio_stream(info: dict) -> str | None:
+    for _ in info.get("streams", []):
+        if _.get("codec_type") == "audio":
+            return _.get("codec_name")
+    raise RuntimeError()
+
+
+def first_pic_index(info: dict) -> int:
+    for _ in info.get("streams", []):
+        if _.get("codec_type") == "video":
+            disp = _.get("disposition") or {}
+            if disp.get("attached_pic") == 1:
+                return (_.get("index"))
+    return 0
 
 
 def ffmpeg_encode(
@@ -521,7 +693,8 @@ def cmd_hashscan(args):
         copied += 1
 
     for path in files:
-        emit_text(f"{sha256(START_DIR / path)} {path}", rep_file)
+        digest = analyze_audio(START_DIR / path, 1)[0]
+        emit_text(f"{digest} {path}", rep_file)
         hashed += 1
 
     if copied:
