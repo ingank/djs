@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from collections import Counter, defaultdict
 from typing import TextIO
+from mutagen.flac import FLAC
 
 
 APP_NAME = "djs.py"
@@ -123,8 +124,8 @@ def emit_copied_lines(count: int, output: TextIO) -> None:
     emit_comment("Copied:", f"{count} lines", output)
 
 
-def emit_copied_files(count: int, output: TextIO) -> None:
-    emit_comment("Copied:", f"{count} files", output)
+def emit_processed_files(count: int, output: TextIO) -> None:
+    emit_comment("Processed:", f"{count} files", output)
 
 
 def emit_listed(count: int, output: TextIO) -> None:
@@ -444,6 +445,14 @@ def first_pic_index(info: dict) -> int:
     return 0
 
 
+def touch_flac_comment(path: Path):
+    flac_file = FLAC(path)
+    if "description" in flac_file:
+        flac_file["COMMENT"] = flac_file["description"]
+        del flac_file["description"]
+        flac_file.save()
+
+
 def ffmpeg_encode(
         scr: Path,
         dst: Path,
@@ -458,9 +467,7 @@ def ffmpeg_encode(
 
     # No embedded cover found: use external placeholder image
     if pic_idx is None:
-        cmd += [
-            "-i", str(NO_COVER)
-        ]
+        cmd += ["-i", str(NO_COVER)]
 
     # Preserve all metadata; mapping audiostream
     cmd += [
@@ -486,21 +493,15 @@ def ffmpeg_encode(
             "-vf", crop
         ]
 
-    cmd += [
-        "-disposition:v:0", "attached_pic"
-    ]
+    cmd += ["-disposition:v:0", "attached_pic"]
 
     ext = scr.suffix.lower().lstrip(".")
 
     if ext in AUDIO_FLAC:
-        audio_args = [
-            "-c:a", "copy"
-        ]
+        audio_args = ["-c:a", "copy"]
 
     elif ext in AUDIO_LOSSLESS:
-        audio_args = [
-            "-c:a", "flac",
-        ]
+        audio_args = ["-c:a", "flac"]
 
     elif ext in AUDIO_LOSSY:
         audio_args = [
@@ -517,11 +518,15 @@ def ffmpeg_encode(
         "-y", str(dst)
     ]
 
-    return cmd
+    proc = subprocess.run(
+        cmd, text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
 
-
-def touch_flac_comment():
-    return
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"Command failed ({proc.returncode}): {' '.join(cmd)}\n{proc.stderr}")
 
 
 # ===========================================================================
@@ -573,7 +578,7 @@ def cmd_copy(args) -> None:
     stage_dir = stage_directory_name("copy")
     emit_staging_area(stage_dir.relative_to(START_DIR), rep_file)
     stage_dir.mkdir(parents=True, exist_ok=True)
-    copied = 0
+    processed = 0
 
     for relative_path in files:
         source = Path(START_DIR / relative_path)
@@ -581,9 +586,9 @@ def cmd_copy(args) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         emit_text(f"{relative_path}", rep_file)
-        copied += 1
+        processed += 1
 
-    emit_copied_files(copied, rep_file)
+    emit_processed_files(processed, rep_file)
     emit_footer(rep_file)
     rep_file.close()
 
@@ -597,7 +602,28 @@ def cmd_dupes(args):
 
 
 def cmd_encode(args):
-    print("Dummy: encode")
+    rep_file = report_file_name("encode", "log").open("w", encoding="utf-8")
+    emit_header(rep_file)
+    emit_scanning(rep_file)
+    files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
+    emit_skipping(len(skipped), rep_file)
+    emit_processing(len(files), rep_file)
+    stage_dir = stage_directory_name("encode")
+    emit_staging_area(stage_dir.relative_to(START_DIR), rep_file)
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    processed = 0
+
+    for rel_path in files:
+        src = Path(START_DIR / rel_path)
+        dst = Path(START_DIR / stage_dir / rel_path.with_suffix(".flac"))
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        ffmpeg_encode(src, dst, None)
+        emit_text(f"{rel_path}", rep_file)
+        processed += 1
+
+    emit_processed_files(processed, rep_file)
+    emit_footer(rep_file)
+    rep_file.close()
 
 
 def cmd_finalize(args):
@@ -697,8 +723,8 @@ def cmd_hashscan(args):
         copied += 1
 
     for path in files:
-        digest = analyze_audio(START_DIR / path, 1)[0]
-        emit_text(f"{digest} {path}", rep_file)
+        digest, lufs, lra = analyze_audio(START_DIR / path, 3)
+        emit_text(f"{digest} {lufs:5.1f} {lra:4.1f} {path}", rep_file)
         hashed += 1
 
     if copied:
