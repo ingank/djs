@@ -18,6 +18,7 @@ from pathlib import Path
 from collections import Counter, defaultdict
 from typing import TextIO
 from mutagen.flac import FLAC
+from typing import Any, Dict
 
 
 APP_NAME = "djs.py"
@@ -31,6 +32,7 @@ START_TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 START_DIR = Path.cwd().resolve()
 START_ARGS = " ".join(sys.argv[1:])
 NO_COVER = Path(APP_DIR / "no_cover.png")
+PRE_TAG = "DJS"
 SEP = f"{os.sep}"
 
 
@@ -446,13 +448,21 @@ def first_audio_stream(info: dict) -> str | None:
     raise RuntimeError()
 
 
-def first_pic_index(info: dict) -> int:
+def first_pic_index(info: dict) -> int | None:
     for _ in info.get("streams", []):
         if _.get("codec_type") == "video":
             disp = _.get("disposition") or {}
             if disp.get("attached_pic") == 1:
                 return (_.get("index"))
-    return 0
+    return None
+
+
+def set_flac_tags(path: Path, tags: Dict[str, Any]) -> None:
+    flac_file = FLAC(path)
+    for tag, value in tags.items():
+        k = tag.lower()
+        flac_file[k] = str(value)
+    flac_file.save()
 
 
 def touch_flac_comment(path: Path):
@@ -627,7 +637,17 @@ def cmd_encode(args):
         src = Path(START_DIR / rel_path)
         dst = Path(START_DIR / stage_dir / rel_path.with_suffix(".flac"))
         dst.parent.mkdir(parents=True, exist_ok=True)
-        ffmpeg_encode(src, dst, None)
+        info = ffprobe_json(src)
+        ffmpeg_encode(src, dst, first_pic_index(info))
+        digest, lufs, lra = analyze_audio(src, 3)
+        mx_tags: Dict[str, Any] = {}
+        mx_tags[f"{PRE_TAG}-HASH"] = digest
+        mx_tags[f"{PRE_TAG}-PATH"] = src
+        mx_tags[f"{PRE_TAG}-DATE"] = START_TIMESTAMP
+        mx_tags[f"{PRE_TAG}-LUFS"] = f"{lufs:.1f}"
+        mx_tags[f"{PRE_TAG}-LRA"] = f"{lra:.1f}"
+        mx_tags[f"{PRE_TAG}-CODEC"] = first_audio_stream(info)
+        set_flac_tags(dst, mx_tags)
         emit_text(f"{rel_path}", rep_file)
         processed += 1
 
