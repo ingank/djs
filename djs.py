@@ -684,11 +684,19 @@ def cmd_hashscan(args):
     its existing hash records are copied into the new report, and only the
     remaining files are hashed.
     """
+    start_time = time.perf_counter()
+
     latest_find = latest_file("fl")
     latest_hashscan = latest_file("hl")
+    previous_records: list[tuple[str, Path]] = []
+
+    mode = 3
+    mode = 1 if args.hash_only else mode
+    mode = 2 if args.loudness_only else mode
+
     skipped = 0
     copied = 0
-    hashed = 0
+    processed = 0
 
     rep_file = report_file_name("hashscan", "hl").open("w", encoding="utf-8")
     emit_header(rep_file)
@@ -709,8 +717,6 @@ def cmd_hashscan(args):
     else:
         emit_scanning(rep_file)
         files, skipped = find_files(START_DIR, AUDIO_EXTENSIONS)
-
-    previous_records: list[tuple[str, Path]] = []
 
     if args.resume:
         if latest_hashscan is None:
@@ -733,14 +739,17 @@ def cmd_hashscan(args):
         copied += 1
 
     for path in files:
-        digest, lufs, lra = analyze_audio(START_DIR / path, 3)
-        emit_text(f"{digest} {lufs:5.1f} {lra:4.1f} {path}", rep_file)
-        hashed += 1
+        digest, lufs, lra = analyze_audio(START_DIR / path, mode)
+        lufs = f"{lufs:5.1f}" if lufs else None
+        lra = f"{lra:4.1f}" if lra else None
+        emit_text(f"{digest} {lufs} {lra} {path}", rep_file)
+        processed += 1
 
     if copied:
         emit_copied_lines(copied, rep_file)
 
-    emit_hashed(hashed, rep_file)
+    emit_processed_files(processed, rep_file)
+    emit_duration(time.perf_counter() - start_time, rep_file)
     emit_footer(rep_file)
     rep_file.close()
 
