@@ -13,6 +13,7 @@ import threading
 import sys
 import os
 import json
+import time
 from pathlib import Path
 from collections import Counter, defaultdict
 from typing import TextIO
@@ -134,6 +135,15 @@ def emit_listed(count: int, output: TextIO) -> None:
 
 def emit_hashed(count: int, output: TextIO) -> None:
     emit_comment("Hashed:", f"{count} files", output)
+
+
+def emit_duration(seconds: float, output: TextIO) -> None:
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds_int = int(seconds % 60)
+    hundredths = int((seconds % 1) * 100)
+    timetext = f"{hours:02d}:{minutes:02d}:{seconds_int:02d},{hundredths:02d}"
+    emit_comment("Duration:", timetext, output)
 
 
 def emit_footer(output: TextIO) -> None:
