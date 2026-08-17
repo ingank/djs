@@ -1037,6 +1037,17 @@ def build_parser():
         action="store_true",
         help="resume an interrupted scan using the last generated hash file",
     )
+    mode_group = p.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--hash-only",
+        action="store_true",
+        help="generate only hashes",
+    )
+    mode_group.add_argument(
+        "--loudness-only",
+        action="store_true",
+        help="generate only loudness values",
+    )
     p.set_defaults(func=cmd_hashscan)
 
     # -----------------------------------------------------------------------
